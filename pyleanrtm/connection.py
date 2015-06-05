@@ -2,8 +2,10 @@ from threading import Timer
 import time
 
 from pyleanrtm.router import RouteManager
+from pyleanrtm.protocol.json_protocol import json_protocol
 
 from ws4py.client.threadedclient import WebSocketClient
+from ws4py.messaging import PingControlMessage
 
 DEFAULT_RETRY_INTERVAL=2
 DEFAULT_COMMAND_TIMEOUT=15
@@ -27,18 +29,21 @@ class LeanRTMWebSocketClient(WebSocketClient):
     def ponged(self):
         self.mgr._on_pong()
 
+    def ping(self):
+        self.send(PingControlMessage())
+
 class WebSocketConnectionManager(object):
     def __init__(self, app_id, region='cn'):
         self.app_id = app_id
         self.route_manager = RouteManager(app_id, region)
-        self.protocol = None
+        self.protocol = json_protocol
         self.conn = None
         self.next_try = DEFAULT_RETRY_INTERVAL
         self.last_pong = 0
         self.keep_alive_thread = None
 
     def _try_start(self, server):
-        conn = LeanRTMWebSocketClient(server, self, protocols=self.protocol)
+        conn = LeanRTMWebSocketClient(server, self, protocols=[self.protocol.name])
         conn.connect()
         self.conn = conn
 
@@ -60,7 +65,8 @@ class WebSocketConnectionManager(object):
                 self._try_start(route.server)
                 self._connect_success(route, False)
                 return
-            except:
+            except Exception as e:
+                print e
                 if route.secondary:
                     try:
                         print "connecting secondary:", route.secondary
@@ -88,8 +94,8 @@ class WebSocketConnectionManager(object):
             return
         self.conn.ping()
 
-    def send(self, msg):
-        self.conn.send(msg)
+    def send(self, cmd):
+        self.conn.send(self.protocol.encode(cmd))
 
     def _on_open(self):
         pass
@@ -98,8 +104,7 @@ class WebSocketConnectionManager(object):
         pass
 
     def _on_message(self, m):
-        print(str(m))
-        pass
+        cmd = self.protocol.decode(m)
 
     def _on_pong(self):
         self.last_pong = time.time()
