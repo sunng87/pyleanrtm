@@ -37,6 +37,18 @@ class Session(object):
         self.manager.send(cmd, success, None)
         self.manager.sessions.pop(self.client_id)
 
+    def start_conversation(self, members, attrs, success=None, fail=None):
+        cmd = conv_start(self.app_id, self.client_id, members, attrs)
+        self.manager.send(cmd, success, fail)
+
+    def add_to_conversation(self, members, cid, success=None, fail=None):
+        cmd = conv_add(self.app_id, self.client_id, members, cid)
+        self.manager.send(cmd, success, fail)
+
+    def remove_from_conversation(self, members, cid, success=None, fail=None):
+        cmd = conv_remove(self.app_id, self.client_id, members, cid)
+        self.manager.send(cmd, success, fail)
+
 class LeanRTMWebSocketClient(WebSocketClient):
     def __init__(self, url, mgr, **kwargs):
         WebSocketClient.__init__(self, url, **kwargs)
