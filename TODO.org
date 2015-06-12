@@ -1,0 +1,3 @@
+* pyleanrtm TODOs
+** TODO data in callbacks
+** TODO thread model for callbacks
