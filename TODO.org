@@ -1,3 +1,5 @@
 * pyleanrtm TODOs
-** TODO data in callbacks
-** TODO thread model for callbacks
+** TODO [#A] data in callbacks
+** TODO [#C] thread model for callbacks
+** TODO [#B] signature
+** TODO [#C] router debug
