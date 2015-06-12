@@ -80,7 +80,7 @@ class LeanRTMWebSocketClient(WebSocketClient):
         self.mgr._on_message(msg)
 
     def closed(self, status, reason):
-        self.mgr._on_close()
+        self.mgr._on_close(status, reason)
 
     def ponged(self):
         self.mgr._on_pong()
@@ -168,10 +168,18 @@ class WebSocketSessionManager(object):
 
     def _on_open(self):
         self.connected = True
+        for s in self.sessions:
+            s.open()
         pass
 
-    def _on_close(self):
+    def _on_close(self, code, reason):
         self.connected = False
+        local_pendings = self.pendings
+        self.pendings = {}
+
+        for _, fcb in local_pendings.vals():
+            fcb(code, reason)
+
         pass
 
     def _on_message(self, m):
