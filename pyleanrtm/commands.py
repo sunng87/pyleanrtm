@@ -84,6 +84,6 @@ def dispatch_event(cmd, session):
             if cmd.get('op') == 'members-left':
                 session.on_clients_left_conversation(cmd.get('cid'), cmd.get('m'), cmd.get('initBy'))
         if cmd.get('cmd') == 'rcp':
-            session.on_receipt(self, cmd.get('id'), cmd.get('cid'))
+            session.on_receipt(cmd.get('id'), cmd.get('cid'))
         if cmd.get('cmd') == 'direct':
-            session.on_message(self, Message(cmd))
+            session.on_message(Message(cmd))

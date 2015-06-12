@@ -19,7 +19,7 @@ class Session(object):
         self.client_id = client_id
         self.manager = session_mgr
         self.app_id = self.manager.app_id
-        manager.sessions[self.client_id] = self
+        self.manager.sessions[self.client_id] = self
         self.opened = False
 
     def send_message(self, cid, msg, transient=False, receipt=False, success=None, fail=None):
@@ -57,6 +57,7 @@ class Session(object):
         pass
 
     def on_message(self, msg):
+        print msg
         pass
 
     def on_receipt(self, msg_id, cid):
@@ -86,7 +87,7 @@ class LeanRTMWebSocketClient(WebSocketClient):
         self.mgr._on_pong()
 
     def ping(self):
-        self.send(PingControlMessage())
+        self.send(PingControlMessage(''))
 
 class WebSocketSessionManager(object):
     def __init__(self, app_id, region='cn'):
@@ -152,6 +153,7 @@ class WebSocketSessionManager(object):
     def keep_alive(self):
         if self.last_pong <= time.time() - DEFAULT_PING_TIMEOUT:
             self._connection_inactive()
+            self._restart()
             return
         self.conn.ping()
 
@@ -161,7 +163,6 @@ class WebSocketSessionManager(object):
 
         self.pendings[serial_id] = (success_cb, failed_cb)
         self.__send(cmd)
-        pass
 
     def __send(self, cmd):
         self.conn.send(self.protocol.encode(cmd))
@@ -177,7 +178,7 @@ class WebSocketSessionManager(object):
         local_pendings = self.pendings
         self.pendings = {}
 
-        for _, fcb in local_pendings.vals():
+        for _, fcb in local_pendings.values():
             fcb(code, reason)
 
         pass
