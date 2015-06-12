@@ -19,6 +19,7 @@ class Session(object):
         self.client_id = client_id
         self.manager = session_mgr
         self.app_id = self.manager.app_id
+        manager.sessions[self.client_id] = self
         self.opened = False
 
     def send_message(self, cid, msg, transient=False, receipt=False, success=None, fail=None):
@@ -48,6 +49,24 @@ class Session(object):
     def remove_from_conversation(self, members, cid, success=None, fail=None):
         cmd = conv_remove(self.app_id, self.client_id, members, cid)
         self.manager.send(cmd, success, fail)
+
+    def on_joined_conversation(self, cid, by):
+        pass
+
+    def on_left_conversation(self, cid, by):
+        pass
+
+    def on_message(self, msg):
+        pass
+
+    def on_receipt(self, msg_id, cid):
+        pass
+
+    def on_clients_joined_conversation(self, cid, m, by):
+        pass
+
+    def on_clients_left_conversation(self, cid, m, by):
+        pass
 
 class LeanRTMWebSocketClient(WebSocketClient):
     def __init__(self, url, mgr, **kwargs):
@@ -170,12 +189,12 @@ class WebSocketSessionManager(object):
                     success_cb(cmd)
         else:
             ## events
+            client_id = cmd.get('peerId')
+            if cmd.get('cmd') == 'direct' and cmd.get('fromPeerId') != cmd.get('peerId'):
+                self.__send(ack_for(cmd))
+
+            dispatch_event(cmd, self.sessions.get(client_id))
             pass
 
     def _on_pong(self):
         self.last_pong = time.time()
-
-    def session(self, client_id):
-        if not self.sessions.has_key(client_id):
-            self.sessions[client_id] = Session(client_id, self)
-        return self.sessions[client_id]
