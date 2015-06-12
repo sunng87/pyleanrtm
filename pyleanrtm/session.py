@@ -1,8 +1,10 @@
 from threading import Timer
 import time
+import itertools
 
 from pyleanrtm.router import RouteManager
 from pyleanrtm.protocol.json_protocol import json_protocol
+from pyleanrtm.commands import *
 
 from ws4py.client.threadedclient import WebSocketClient
 from ws4py.messaging import PingControlMessage
@@ -11,6 +13,29 @@ DEFAULT_RETRY_INTERVAL=2
 DEFAULT_COMMAND_TIMEOUT=15
 DEFAULT_PING_TIMEOUT=400
 DEFAULT_PING_INTERVAL=150
+
+class Session(object):
+    def __init__(self, client_id, session_mgr):
+        self.client_id = client_id
+        self.manager = session_mgr
+        self.app_id = self.manager.app_id
+        self.opened = False
+
+    def send_message(self, cid, msg, transient=False, receipt=False, success=None, fail=None):
+        cmd = direct(self.app_id, self.client_id, msg, cid, transient, receipt)
+        self.manager.send(cmd, success, fail)
+
+    def open(self, success=None, fail=None):
+        self.opened = True
+        cmd = session_open(self.app_id, self.client_id)
+        self.manager.send(cmd, success, fail)
+
+    def close(self, success=None):
+        self.opened = False
+        cmd = session_close(self.app_id, self.client_id)
+        ## remove from self.manager
+        self.manager.send(cmd, success, None)
+        self.manager.sessions.pop(self.client_id)
 
 class LeanRTMWebSocketClient(WebSocketClient):
     def __init__(self, url, mgr, **kwargs):
@@ -32,7 +57,7 @@ class LeanRTMWebSocketClient(WebSocketClient):
     def ping(self):
         self.send(PingControlMessage())
 
-class WebSocketConnectionManager(object):
+class WebSocketSessionManager(object):
     def __init__(self, app_id, region='cn'):
         self.app_id = app_id
         self.route_manager = RouteManager(app_id, region)
@@ -41,6 +66,11 @@ class WebSocketConnectionManager(object):
         self.next_try = DEFAULT_RETRY_INTERVAL
         self.last_pong = 0
         self.keep_alive_thread = None
+        self.connected = False
+        self.pendings = {}
+        ## TODO, is this thread-safe?
+        self.id_gen = itertools.count(1)
+        self.sessions = {}
 
     def _try_start(self, server):
         conn = LeanRTMWebSocketClient(server, self, protocols=[self.protocol.name])
@@ -94,17 +124,46 @@ class WebSocketConnectionManager(object):
             return
         self.conn.ping()
 
-    def send(self, cmd):
+    def send(self, cmd, success_cb, failed_cb):
+        serial_id = self.id_gen.next()
+        cmd['i'] = serial_id
+
+        self.pendings[serial_id] = (success_cb, failed_cb)
+        self.__send(cmd)
+        pass
+
+    def __send(self, cmd):
         self.conn.send(self.protocol.encode(cmd))
 
     def _on_open(self):
+        self.connected = True
         pass
 
     def _on_close(self):
+        self.connected = False
         pass
 
     def _on_message(self, m):
         cmd = self.protocol.decode(m)
+        if cmd.has_key('i'):
+            serial_id = cmd['i']
+            if self.pendings.has_key(serial_id):
+                success_cb, fail_cb = self.pendings.pop(serial_id)
+                error = parse_error(cmd)
+                if error:
+                    if fail_cb is not None:
+                        fail_cb(*error)
+                elif success_cb is not None:
+                    ## TODO: only expose some of fields
+                    success_cb(cmd)
+        else:
+            ## events
+            pass
 
     def _on_pong(self):
         self.last_pong = time.time()
+
+    def session(self, client_id):
+        if not self.sessions.has_key(client_id):
+            self.sessions[client_id] = Session(client_id, self)
+        return self.sessions[client_id]
