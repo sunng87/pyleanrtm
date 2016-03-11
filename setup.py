@@ -16,7 +16,8 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [
     # TODO: put package requirements here
-    'ws4py'
+    'ws4py==0.3.4',
+    'protobuf==2.6.1'
 ]
 
 test_requirements = [
